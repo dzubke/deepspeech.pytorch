@@ -38,10 +38,11 @@ def evaluate(test_loader, device, model, decoder, target_decoder, save_output=Fa
             offset += size
 
         out, output_sizes = model(inputs, input_sizes)
-
+        print(f"test: out: {out}, output_sizes: {output_sizes}")
         decoded_output, _ = decoder.decode(out, output_sizes)
+        print(f"test: decoded_output: {decoded_output}")
         target_strings = target_decoder.convert_to_strings(split_targets)
-
+        print(f"test: target_strings: {target_strings}")
         if save_output is not None:
             # add output to data array, and continue
             output_data.append((out.cpu().numpy(), output_sizes.numpy(), target_strings))

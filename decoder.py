@@ -41,7 +41,7 @@ class Decoder(object):
             space_index = labels.index(' ')
         self.space_index = space_index
 
-    def wer(self, s1, s2):
+    def wer(self, s1, s2, use_phones=True):
         """
         Computes the Word Error Rate, defined as the edit distance between the
         two provided sentences after tokenizing to words.
@@ -49,16 +49,21 @@ class Decoder(object):
             s1 (string): space-separated sentence
             s2 (string): space-separated sentence
         """
+        print(f"WER: s1: {s1}, s2: {s2}")
+        if use_phones: 
+            b = set(s1+s2)
+            raise NotImplementedError
+        else:
+            # build mapping of words to integers
+            b = set(s1.split() + s2.split())
+            word2char = dict(zip(b, range(len(b))))
 
-        # build mapping of words to integers
-        b = set(s1.split() + s2.split())
-        word2char = dict(zip(b, range(len(b))))
-
-        # map the words to a char array (Levenshtein packages only accepts
-        # strings)
-        w1 = [chr(word2char[w]) for w in s1.split()]
-        w2 = [chr(word2char[w]) for w in s2.split()]
-
+            # map the words to a char array (Levenshtein packages only accepts
+            # strings)
+            w1 = [chr(word2char[w]) for w in s1.split()]
+            w2 = [chr(word2char[w]) for w in s2.split()]
+        
+        print(f"WER: w1: {w1}, w2: {w2}")
         return Lev.distance(''.join(w1), ''.join(w2))
 
     def cer(self, s1, s2):
@@ -69,6 +74,7 @@ class Decoder(object):
             s1 (string): space-separated sentence
             s2 (string): space-separated sentence
         """
+        print(f"CER: s1: {s1}, s2: {s2}")    
         s1, s2, = s1.replace(' ', ''), s2.replace(' ', '')
         return Lev.distance(s1, s2)
 
@@ -163,7 +169,7 @@ class GreedyDecoder(Decoder):
             return strings
 
     def process_string(self, sequence, size, remove_repetitions=False):
-        string = ''
+        array = []
         offsets = []
         for i in range(size):
             char = self.int_to_char[sequence[i].item()]
@@ -171,13 +177,13 @@ class GreedyDecoder(Decoder):
                 # if this char is a repetition and remove_repetitions=true, then skip
                 if remove_repetitions and i != 0 and char == self.int_to_char[sequence[i - 1].item()]:
                     pass
-                elif char == self.labels[self.space_index]:
-                    string += ' '
-                    offsets.append(i)
+                #elif char == self.labels[self.space_index]:
+                #    string += ' '
+                #    offsets.append(i)
                 else:
-                    string = string + char
+                    array.append(char)
                     offsets.append(i)
-        return string, torch.tensor(offsets, dtype=torch.int)
+        return array, torch.tensor(offsets, dtype=torch.int)
 
     def decode(self, probs, sizes=None):
         """

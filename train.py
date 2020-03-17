@@ -167,7 +167,8 @@ if __name__ == '__main__':
                 tensorboard_logger.load_previous_values(start_epoch, package)
     else:
         with open(args.labels_path) as label_file:
-            labels = str(''.join(json.load(label_file)))
+            #labels = str(''.join(json.load(label_file)))
+            labels = json.load(label_file)                
 
         audio_conf = dict(sample_rate=args.sample_rate,
                           window_size=args.window_size,
@@ -209,7 +210,7 @@ if __name__ == '__main__':
     parameters = model.parameters()
     optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                 momentum=args.momentum, nesterov=True, weight_decay=1e-5)
-
+    print(f"loss scale: {args.loss_scale}")
     model, optimizer = amp.initialize(model, optimizer,
                                       opt_level=args.opt_level,
                                       keep_batchnorm_fp32=args.keep_batchnorm_fp32,
@@ -306,7 +307,8 @@ if __name__ == '__main__':
                                              device=device,
                                              model=model,
                                              decoder=decoder,
-                                             target_decoder=decoder)
+                                             target_decoder=decoder, 
+                                             verbose=True)
         loss_results[epoch] = avg_loss
         wer_results[epoch] = wer
         cer_results[epoch] = cer

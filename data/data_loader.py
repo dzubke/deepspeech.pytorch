@@ -159,6 +159,7 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         self.ids = ids
         self.size = len(ids)
         self.labels_map = dict([(labels[i], i) for i in range(len(labels))])
+        print(self.labels_map)
         super(SpectrogramDataset, self).__init__(audio_conf, normalize, speed_volume_perturb, spec_augment)
 
     def __getitem__(self, index):
@@ -170,8 +171,11 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
 
     def parse_transcript(self, transcript_path):
         with open(transcript_path, 'r', encoding='utf8') as transcript_file:
-            transcript = transcript_file.read().replace('\n', '')
-        transcript = list(filter(None, [self.labels_map.get(x) for x in list(transcript)]))
+            transcript = transcript_file.read().split()
+            for phone in transcript:
+                if self.labels_map.get(phone, "missing")=="missing":
+                    raise ValueError(f"phoneme \"{phone}\" in transcript not in labels")
+        transcript = list(filter(None, [self.labels_map.get(x) for x in transcript]))
         return transcript
 
     def __len__(self):
