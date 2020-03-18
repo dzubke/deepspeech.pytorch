@@ -74,11 +74,28 @@ class NoiseInjection(object):
         noise_start = np.random.rand() * (noise_len - data_len)
         noise_end = noise_start + data_len
         noise_dst = audio_with_sox(noise_path, self.sample_rate, noise_start, noise_end)
+        noise_dst = same_size(data, noise_dst)
         assert len(data) == len(noise_dst)
         noise_energy = np.sqrt(noise_dst.dot(noise_dst) / noise_dst.size)
         data_energy = np.sqrt(data.dot(data) / data.size)
         data += noise_level * noise_dst * data_energy / noise_energy
         return data
+    
+    @staticmethod
+    def same_size(data:np.ndarray, noise_dst:np.ndarray) -> np.ndarray:
+    """
+    this function adjusts the size of noise_dist to be the same as data size
+    """
+    if data.size == noise_dst.size:
+        return noise_dst
+    elif data.size < noise_dst.size:
+        size_diff = noise_dst.size - data.size
+        return noise_dst[:-size_diff]
+    elif data.size > noise_dst.size:
+        size_diff = data.size - noise_dst.size
+        zero_diff = np.zeros((size_diff))
+        return np.concatenate((noise_dst, zero_diff), axis=0)
+
 
 
 class SpectrogramParser(AudioParser):
@@ -159,7 +176,6 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         self.ids = ids
         self.size = len(ids)
         self.labels_map = dict([(labels[i], i) for i in range(len(labels))])
-        print(self.labels_map)
         super(SpectrogramDataset, self).__init__(audio_conf, normalize, speed_volume_perturb, spec_augment)
 
     def __getitem__(self, index):

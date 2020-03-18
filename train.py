@@ -178,7 +178,7 @@ if __name__ == '__main__':
                           noise_prob=args.noise_prob,
                           noise_levels=(args.noise_min, args.noise_max),
                           spec_augment = args.spec_augment,
-                          speed_volumne_perturb = args.speed_volume_perturb)
+                          speed_volume_perturb = args.speed_volume_perturb)
 
 
         rnn_type = args.rnn_type.lower()
