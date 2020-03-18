@@ -50,15 +50,6 @@ def parse_write_labels(data_json:list):
     return data_paths
 
 
-def write_manifest(audio_text_paths:list, manifest_name:str):
-    
-    manifest_path = os.path.join("./", manifest_name)
-    with open(manifest_path, 'w') as fid:
-        for audio_path, text_path in audio_text_paths:
-            fid.write(f"{audio_path},{text_path}\n")
-
-
-
 def write_to_file(phones:list, txt_path:str):
     """
     writes phonemes in phones to txt_path
@@ -66,6 +57,15 @@ def write_to_file(phones:list, txt_path:str):
     with open(txt_path, 'w') as fid:
         phone_str = " ".join(phones) 
         fid.write(phone_str) 
+
+
+def write_manifest(audio_text_paths:list, manifest_name:str):
+    
+    manifest_path = os.path.join("./", manifest_name)
+    with open(manifest_path, 'w') as fid:
+        for audio_path, text_path in audio_text_paths:
+            fid.write(f"{audio_path},{text_path}\n")
+
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(
