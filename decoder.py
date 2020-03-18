@@ -49,24 +49,24 @@ class Decoder(object):
             s1 (string): space-separated sentence
             s2 (string): space-separated sentence
         """
-        print(f"WER: s1: {s1}, s2: {s2}")
-        if use_phones: 
-            b = set(s1+s2)
-            raise NotImplementedError
-        else:
-            # build mapping of words to integers
-            b = set(s1.split() + s2.split())
-            word2char = dict(zip(b, range(len(b))))
-
-            # map the words to a char array (Levenshtein packages only accepts
-            # strings)
-            w1 = [chr(word2char[w]) for w in s1.split()]
-            w2 = [chr(word2char[w]) for w in s2.split()]
+        #print(f"WER: s1: {s1}, s2: {s2}")
+        if use_phones:
+            s1 = " ".join(s1)
+            s2 = " ".join(s2)
         
-        print(f"WER: w1: {w1}, w2: {w2}")
+        # build mapping of words to integers
+        b = set(s1.split() + s2.split())
+        word2char = dict(zip(b, range(len(b))))
+
+        # map the words to a char array (Levenshtein packages only accepts
+        # strings)
+        w1 = [chr(word2char[w]) for w in s1.split()]
+        w2 = [chr(word2char[w]) for w in s2.split()]
+        
+        #print(f"WER: w1: {w1}, w2: {w2}")
         return Lev.distance(''.join(w1), ''.join(w2))
 
-    def cer(self, s1, s2):
+    def cer(self, s1, s2, use_phones=True):
         """
         Computes the Character Error Rate, defined as the edit distance.
 
@@ -74,7 +74,11 @@ class Decoder(object):
             s1 (string): space-separated sentence
             s2 (string): space-separated sentence
         """
-        print(f"CER: s1: {s1}, s2: {s2}")    
+        #print(f"CER: s1: {s1}, s2: {s2}")    
+        if use_phones:
+            s1 = " ".join(s1)
+            s2 = " ".join(s2)
+        
         s1, s2, = s1.replace(' ', ''), s2.replace(' ', '')
         return Lev.distance(s1, s2)
 

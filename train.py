@@ -57,7 +57,7 @@ parser.add_argument('--speed-volume-perturb', dest='speed_volume_perturb', actio
 parser.add_argument('--spec-augment', dest='spec_augment', action='store_true', help='Use simple spectral augmentation on mel spectograms.')
 parser.add_argument('--noise-dir', default=None,
                     help='Directory to inject noise into audio. If default, noise Inject not added')
-parser.add_argument('--noise-prob', default=0.4, help='Probability of noise being added per sample')
+parser.add_argument('--noise-prob', default=0.4, type=float,  help='Probability of noise being added per sample')
 parser.add_argument('--noise-min', default=0.0,
                     help='Minimum noise level to sample from. (1.0 means all noise, not original signal)', type=float)
 parser.add_argument('--noise-max', default=0.5,
@@ -176,7 +176,10 @@ if __name__ == '__main__':
                           window=args.window,
                           noise_dir=args.noise_dir,
                           noise_prob=args.noise_prob,
-                          noise_levels=(args.noise_min, args.noise_max))
+                          noise_levels=(args.noise_min, args.noise_max),
+                          spec_augment = args.spec_augment,
+                          speed_volumne_perturb = args.speed_volume_perturb)
+
 
         rnn_type = args.rnn_type.lower()
         assert rnn_type in supported_rnns, "rnn_type should be either lstm, rnn or gru"
@@ -308,7 +311,7 @@ if __name__ == '__main__':
                                              model=model,
                                              decoder=decoder,
                                              target_decoder=decoder, 
-                                             verbose=True)
+                                             verbose=False)
         loss_results[epoch] = avg_loss
         wer_results[epoch] = wer
         cer_results[epoch] = cer
