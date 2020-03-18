@@ -75,7 +75,7 @@ class NoiseInjection(object):
         noise_end = noise_start + data_len
         noise_dst = audio_with_sox(noise_path, self.sample_rate, noise_start, noise_end)
         noise_dst = same_size(data, noise_dst)
-        assert len(data) == len(noise_dst)
+        assert len(data) == len(noise_dst), f"data length {len(data)} doesn't match noise len {len(noise_dst)}"
         noise_energy = np.sqrt(noise_dst.dot(noise_dst) / noise_dst.size)
         data_energy = np.sqrt(data.dot(data) / data.size)
         data += noise_level * noise_dst * data_energy / noise_energy
