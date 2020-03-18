@@ -282,9 +282,12 @@ if __name__ == '__main__':
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
+            duration += batch_time.val + data_time.val
+            remaining += (len(train_sampler)-i-1) * (batch_time.avg + data_time.avg)
             if not args.silent:
                 print('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                      'Time: [{duration:.2f} | {remaining:.2f}\t'
+                      'Model {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
                     (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time, data_time=data_time, loss=losses))
