@@ -74,7 +74,7 @@ class NoiseInjection(object):
         noise_start = np.random.rand() * (noise_len - data_len)
         noise_end = noise_start + data_len
         noise_dst = audio_with_sox(noise_path, self.sample_rate, noise_start, noise_end)
-        noise_dst = same_size(data, noise_dst)
+        noise_dst = self.same_size(data, noise_dst)
         assert len(data) == len(noise_dst), f"data length {len(data)} doesn't match noise len {len(noise_dst)}"
         noise_energy = np.sqrt(noise_dst.dot(noise_dst) / noise_dst.size)
         data_energy = np.sqrt(data.dot(data) / data.size)
@@ -83,18 +83,18 @@ class NoiseInjection(object):
     
     @staticmethod
     def same_size(data:np.ndarray, noise_dst:np.ndarray) -> np.ndarray:
-    """
-    this function adjusts the size of noise_dist to be the same as data size
-    """
-    if data.size == noise_dst.size:
-        return noise_dst
-    elif data.size < noise_dst.size:
-        size_diff = noise_dst.size - data.size
-        return noise_dst[:-size_diff]
-    elif data.size > noise_dst.size:
-        size_diff = data.size - noise_dst.size
-        zero_diff = np.zeros((size_diff))
-        return np.concatenate((noise_dst, zero_diff), axis=0)
+        """
+        this function adjusts the size of noise_dist to be the same as data size
+        """
+        if data.size == noise_dst.size:
+            return noise_dst
+        elif data.size < noise_dst.size:
+            size_diff = noise_dst.size - data.size
+            return noise_dst[:-size_diff]
+        elif data.size > noise_dst.size:
+            size_diff = data.size - noise_dst.size
+            zero_diff = np.zeros((size_diff))
+            return np.concatenate((noise_dst, zero_diff), axis=0)
 
 
 

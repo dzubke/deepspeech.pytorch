@@ -41,7 +41,9 @@ def parse_write_labels(data_json:list):
     for sample in data_json:
         phones = sample.get("text", [])
         audio_path = sample.get("audio", "")
-        txt_path = audio_path.replace(".wav", ".txt")
+        extensions = [".wav", ".wv"]
+        audio_ext = list(filter(lambda x: x in audio_path, extensions))[0]
+        txt_path = audio_path.replace(audio_ext, ".txt")
         write_to_file(phones, txt_path)
         data_paths.append((audio_path, txt_path))
      
