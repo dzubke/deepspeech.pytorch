@@ -11,7 +11,7 @@ def main(json_path:str)->None:
     Enteries in data.json look like:
     {"text": [<comma separated labels>], "duration": X.XX, "audio": <path_to_audio>}
     Entries in manifest.csv look like:
-    path/to/audio, path/to/txt_labels
+    path/to/audio,path/to/txt_labels
     This file will parse the data.json, save the labels in a txt
     file, and then output a manifest file
     """
@@ -35,15 +35,6 @@ def convert_to_manifest(data_json:list, manifest_name:str):
     audio_txt_paths = parse_write_labels(data_json)
     write_manifest(audio_txt_paths, manifest_name)
     
-
-def write_manifest(audio_text_paths:list, manifest_name:str):
-    
-    manifest_path = os.path.join("./", manifest_name)
-    with open(manifest_path, 'w') as fid:
-        for audio_path, text_path in audio_text_paths:
-            fid.write(f"{audio_path},{text_path}\n")
-
-
 def parse_write_labels(data_json:list):
     
     data_paths = list(tuple())
@@ -55,6 +46,16 @@ def parse_write_labels(data_json:list):
         data_paths.append((audio_path, txt_path))
      
     return data_paths
+
+
+def write_manifest(audio_text_paths:list, manifest_name:str):
+    
+    manifest_path = os.path.join("./", manifest_name)
+    with open(manifest_path, 'w') as fid:
+        for audio_path, text_path in audio_text_paths:
+            fid.write(f"{audio_path},{text_path}\n")
+
+
 
 def write_to_file(phones:list, txt_path:str):
     """

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ----------------------------------------------------------------------------
-# Modified to support pytorch Tensors
+# Modified to suppocd rt pytorch Tensors
 
 import Levenshtein as Lev
 import torch
