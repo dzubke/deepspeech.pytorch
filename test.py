@@ -38,11 +38,12 @@ def evaluate(test_loader, device, model, decoder, target_decoder, save_output=Fa
             offset += size
 
         out, output_sizes = model(inputs, input_sizes)
-        print(f"test: out: {out}, output_sizes: {output_sizes}")
+        #print(f"test: out sizes: {[x.size() for x in out]}")
+        #print(f"test: output_sizes: {output_sizes}")
         decoded_output, _ = decoder.decode(out, output_sizes)
-        print(f"test: decoded_output: {decoded_output}")
+        #print(f"test: decoded_output: {decoded_output}, size: {[len(out[0]) for out in decoded_output]}")
         target_strings = target_decoder.convert_to_strings(split_targets)
-        print(f"test: target_strings: {target_strings}")
+        #print(f"test: target_strings: {target_strings}")
         if save_output is not None:
             # add output to data array, and continue
             output_data.append((out.cpu().numpy(), output_sizes.numpy(), target_strings))
@@ -52,13 +53,13 @@ def evaluate(test_loader, device, model, decoder, target_decoder, save_output=Fa
             cer_inst = decoder.cer(transcript, reference)
             total_wer += wer_inst
             total_cer += cer_inst
-            num_tokens += len(reference.split())
-            num_chars += len(reference.replace(' ', ''))
+            num_tokens += len(reference)
+            num_chars += len("".join(reference))
             if verbose:
-                print("Ref:", reference.lower())
-                print("Hyp:", transcript.lower())
-                print("WER:", float(wer_inst) / len(reference.split()),
-                      "CER:", float(cer_inst) / len(reference.replace(' ', '')), "\n")
+                print("Ref:", reference)
+                print("Hyp:", transcript)
+                print("WER:", float(wer_inst) / len(reference),
+                      "CER:", float(cer_inst) / len("".join(reference)), "\n")
     wer = float(total_wer) / num_tokens
     cer = float(total_cer) / num_chars
     return wer * 100, cer * 100, output_data
