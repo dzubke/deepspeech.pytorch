@@ -14,16 +14,11 @@ parser.add_argument('--min-duration', default=1, type=int,
 parser.add_argument('--max-duration', default=15, type=int,
                     help='Prunes any samples longer than the max duration (given in seconds, default 15)')
 parser.add_argument('--output-path', default='merged_manifest.csv', help='Output path to merged manifest')
-parser.add_argument('--verbose', action='store_true', help='Prints information while processing')
 
 args = parser.parse_args()
 
 file_paths = []
 manifest_files =  os.listdir(args.merge_dir)
-
-if args.verbose:
-    print(f"The files below will be merged into {args.output_path}:
-            {"\n".join(manifest_files)} ")
 
 for file in manifest_files:
     if file.endswith(".csv"):
