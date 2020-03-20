@@ -68,7 +68,6 @@ class MaskConv(nn.Module):
             x = x.masked_fill(mask, 0)
         return x, lengths
 
-
 class InferenceBatchSoftmax(nn.Module):
     def forward(self, input_):
         if not self.training:
@@ -130,7 +129,7 @@ class Lookahead(nn.Module):
 
 class DeepSpeech(nn.Module):
     def __init__(self, rnn_type=nn.LSTM, labels="abc", rnn_hidden_size=768, nb_layers=5, audio_conf=None,
-                 bidirectional=True, context=20):
+                 bidirectional=True, use_lookahead=False, context=20):
         super(DeepSpeech, self).__init__()
 
         # model metadata needed for serialization/deserialization
@@ -143,13 +142,14 @@ class DeepSpeech(nn.Module):
         self.audio_conf = audio_conf or {}
         self.labels = labels
         self.bidirectional = bidirectional
+        self.use_lookahead = use_lookahead
 
         sample_rate = self.audio_conf.get("sample_rate", 16000)
         window_size = self.audio_conf.get("window_size", 0.02)
         num_classes = len(self.labels)
 
         self.conv = MaskConv(nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 2), padding=(20, 5)),
+            nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 1), padding=(20, 5)),
             nn.BatchNorm2d(32),
             nn.Hardtanh(0, 20, inplace=True),
             nn.Conv2d(32, 32, kernel_size=(21, 11), stride=(2, 1), padding=(10, 5)),
@@ -175,7 +175,7 @@ class DeepSpeech(nn.Module):
             # consider adding batch norm?
             Lookahead(rnn_hidden_size, context=context),
             nn.Hardtanh(0, 20, inplace=True)
-        ) if not bidirectional else None
+        ) if self.use_lookahead else None
 
         fully_connected = nn.Sequential(
             nn.BatchNorm1d(rnn_hidden_size),
@@ -198,7 +198,7 @@ class DeepSpeech(nn.Module):
         for rnn in self.rnns:
             x = rnn(x, output_lengths)
 
-        if not self.bidirectional:  # no need for lookahead layer in bidirectional
+        if self.use_lookahead:  # no need for lookahead layer in bidirectional
             x = self.lookahead(x)
 
         x = self.fc(x)
@@ -228,7 +228,8 @@ class DeepSpeech(nn.Module):
                     labels=package['labels'],
                     audio_conf=package['audio_conf'],
                     rnn_type=supported_rnns[package['rnn_type']],
-                    bidirectional=package.get('bidirectional', True))
+                    bidirectional=package.get('bidirectional', True),
+                    use_lookahead=package.get('use_lookahead', False))
         model.load_state_dict(package['state_dict'])
         for x in model.rnns:
             x.flatten_parameters()
@@ -241,7 +242,8 @@ class DeepSpeech(nn.Module):
                     labels=package['labels'],
                     audio_conf=package['audio_conf'],
                     rnn_type=supported_rnns[package['rnn_type']],
-                    bidirectional=package.get('bidirectional', True))
+                    bidirectional=package.get('bidirectional', True),
+                    use_lookahead=package.get('use_lookahead', False))
         model.load_state_dict(package['state_dict'])
         return model
 
@@ -259,6 +261,7 @@ class DeepSpeech(nn.Module):
             'labels': model.labels,
             'state_dict': model.state_dict(),
             'bidirectional': model.bidirectional,
+            'use_lookahead': model.use_lookahead
         }
         if optimizer is not None:
             package['optim_dict'] = optimizer.state_dict()

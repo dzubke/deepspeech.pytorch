@@ -67,7 +67,9 @@ parser.add_argument('--no-shuffle', dest='no_shuffle', action='store_true',
 parser.add_argument('--no-sortaGrad', dest='no_sorta_grad', action='store_true',
                     help='Turn off ordering of dataset on sequence length for the first epoch.')
 parser.add_argument('--no-bidirectional', dest='bidirectional', action='store_false', default=True,
-                    help='Turn off bi-directional RNNs, introduces lookahead convolution')
+                    help='Turn off bi-directional RNNs')
+parser.add_argument('--use-lookahead', dest='use_lookahead', action='store_true', default=False,
+                    help='Turns on lookahead convolution')
 parser.add_argument('--dist-url', default='tcp://127.0.0.1:1550', type=str,
                     help='url used to set up distributed training')
 parser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
@@ -188,7 +190,8 @@ if __name__ == '__main__':
                            labels=labels,
                            rnn_type=supported_rnns[rnn_type],
                            audio_conf=audio_conf,
-                           bidirectional=args.bidirectional)
+                           bidirectional=args.bidirectional,
+                           use_lookahead=args.use_lookahead)
 
     decoder = GreedyDecoder(labels)
     train_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest, labels=labels,
@@ -234,11 +237,13 @@ if __name__ == '__main__':
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
+    train_duration=0
 
     for epoch in range(start_epoch, args.epochs):
         model.train()
         end = time.time()
         start_epoch_time = time.time()
+        epoch_remaining = 0
         for i, (data) in enumerate(train_loader, start=start_iter):
             if i == len(train_sampler):
                 break
@@ -282,15 +287,15 @@ if __name__ == '__main__':
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
-            duration += batch_time.val + data_time.val
-            remaining += (len(train_sampler)-i-1) * (batch_time.avg + data_time.avg)
+            train_duration += (batch_time.val + data_time.val)/3600
+            epoch_remaining = (len(train_sampler)-i-1) * (batch_time.avg + data_time.avg)/3600
             if not args.silent:
                 print('Epoch: [{0}][{1}/{2}]\t'
-                      'Time: [{duration:.2f} | {remaining:.2f}\t'
+                      'Time(hr) tot:{train_duration:.2f} | rem:{epoch_remaining:.2f}\t'
                       'Model {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
-                    (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time, data_time=data_time, loss=losses))
+                    (epoch + 1), (i + 1), len(train_sampler), train_duration=train_duration, epoch_remaining=epoch_remaining, batch_time=batch_time, data_time=data_time, loss=losses))
             if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0 and main_proc:
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth' % (save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
