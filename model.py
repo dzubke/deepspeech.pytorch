@@ -154,13 +154,17 @@ class DeepSpeech(nn.Module):
             nn.Hardtanh(0, 20, inplace=True),
             nn.Conv2d(32, 32, kernel_size=(21, 11), stride=(2, 1), padding=(10, 5)),
             nn.BatchNorm2d(32),
-            nn.Hardtanh(0, 20, inplace=True)
+            nn.Hardtanh(0, 20, inplace=True), 
+            #nn.Conv2d(32, 96, kernel_size=(21, 11), stride=(1, 1), padding=(10, 5)),
+            #nn.BatchNorm2d(96),
+            #nn.Hardtanh(0, 20, inplace=True)
         ))
         # Based on above convolutions and spectrogram size using conv formula (W - F + 2P)/ S+1
         rnn_input_size = int(math.floor((sample_rate * window_size) / 2) + 1)
         rnn_input_size = int(math.floor(rnn_input_size + 2 * 20 - 41) / 2 + 1)
         rnn_input_size = int(math.floor(rnn_input_size + 2 * 10 - 21) / 2 + 1)
-        rnn_input_size *= 32
+        #rnn_input_size = int(math.floor(rnn_input_size + 2 * 10 - 21) / 1 + 1)
+        rnn_input_size *= 32 #96
 
         rnns = []
         rnn = BatchRNN(input_size=rnn_input_size, hidden_size=rnn_hidden_size, rnn_type=rnn_type,
@@ -246,6 +250,30 @@ class DeepSpeech(nn.Module):
                     use_lookahead=package.get('use_lookahead', False))
         model.load_state_dict(package['state_dict'])
         return model
+    
+    def load_pretrained(self, state_dict_path:str)->None:
+        """
+        Loads the weights from a state_dict of trained model based on the dictionary mapping specified
+        """    
+        trained_state_dict = torch.load(state_dict_path, map_location=torch.device('cpu'))
+        
+        # remove certain layers from the pretained model
+        remove_layers = self.remove_layers()
+        trained_state_dict = OrderedDict({k:val for k,val in trained_state_dict.items() 
+            if k not in remove_layers})
+        # map the layer names from the trained state_dict to the model state_dict
+        layer_map = self.layer_mapping()
+        trained_state_dict = OrderedDict({layer_map[key]:val for key,val in trained_state_dict.items()})
+        # swap the freq and time dimensions in the conv weights
+        transpose_layers = ['conv.seq_module.0.weight', 'conv.seq_module.3.weight', 'conv.seq_module.6.weight']
+        for key in transpose_layers: 
+            trained_state_dict[key] = trained_state_dict[key].transpose(2,3)
+        # update the destination model state dict with the update_state_dict
+        model_state_dict = self.state_dict()
+        model_state_dict.update(trained_state_dict)
+        equal_bool = [(model_state_dict[val]==trained_state_dict[val]).all() for val in layer_map.values()]
+        assert all(equal_bool), "transfered layers are not all equal"
+        self.load_state_dict(model_state_dict)
 
     @staticmethod
     def serialize(model, optimizer=None, amp=None, epoch=None, iteration=None, loss_results=None,
@@ -290,6 +318,65 @@ class DeepSpeech(nn.Module):
                 tmp *= x
             params += tmp
         return params
+
+    def layer_mapping(self):
+        """
+        returns a constructed dictionary mapping of the layers from awni model to naren model
+        """
+
+        layer_mapping = {'conv.0.weight':'conv.seq_module.0.weight',
+                'conv.0.bias':'conv.seq_module.0.bias',
+                'conv.1.weight':'conv.seq_module.1.weight',
+                'conv.1.bias':'conv.seq_module.1.bias',
+                'conv.1.running_mean':'conv.seq_module.1.running_mean',
+                'conv.1.running_var':'conv.seq_module.1.running_var',
+                'conv.1.num_batches_tracked':'conv.seq_module.1.num_batches_tracked',
+                'conv.4.weight':'conv.seq_module.3.weight',
+                'conv.4.bias':'conv.seq_module.3.bias',
+                'conv.5.weight':'conv.seq_module.4.weight',
+                'conv.5.bias':'conv.seq_module.4.bias',
+                'conv.5.running_mean':'conv.seq_module.4.running_mean',
+                'conv.5.running_var':'conv.seq_module.4.running_var',
+                'conv.5.num_batches_tracked':'conv.seq_module.4.num_batches_tracked',
+                'conv.8.weight': 'conv.seq_module.6.weight', 
+                'conv.8.bias': 'conv.seq_module.6.bias', 
+                'conv.9.weight': 'conv.seq_module.7.weight',
+                'conv.9.bias': 'conv.seq_module.7.bias', 
+                'conv.9.running_mean': 'conv.seq_module.7.running_mean',
+                'conv.9.running_var': 'conv.seq_module.7.running_var',
+                'conv.9.num_batches_tracked': 'conv.seq_module.7.num_batches_tracked', 
+                'rnn.weight_ih_l0': 'rnns.0.rnn.weight_ih_l0', 
+                'rnn.weight_hh_l0': 'rnns.0.rnn.weight_hh_l0',
+                'rnn.bias_ih_l0': 'rnns.0.rnn.bias_ih_l0', 
+                'rnn.bias_hh_l0': 'rnns.0.rnn.bias_hh_l0',
+                'rnn.weight_ih_l1':'rnns.1.rnn.weight_ih_l0',
+                'rnn.weight_hh_l1':'rnns.1.rnn.weight_hh_l0',
+                'rnn.bias_ih_l1':'rnns.1.rnn.bias_ih_l0',
+                'rnn.bias_hh_l1':'rnns.1.rnn.bias_hh_l0',
+                'rnn.weight_ih_l2':'rnns.2.rnn.weight_ih_l0',
+                'rnn.weight_hh_l2':'rnns.2.rnn.weight_hh_l0',
+                'rnn.bias_ih_l2':'rnns.2.rnn.bias_ih_l0',
+                'rnn.bias_hh_l2':'rnns.2.rnn.bias_hh_l0',
+                'rnn.weight_ih_l3': 'rnns.3.rnn.weight_ih_l0',
+                'rnn.weight_hh_l3': 'rnns.3.rnn.weight_hh_l0',
+                'rnn.bias_ih_l3':'rnns.3.rnn.bias_ih_l0',
+                'rnn.bias_hh_l3':'rnns.3.rnn.bias_hh_l0',
+                'rnn.weight_ih_l4':'rnns.4.rnn.weight_ih_l0',
+                'rnn.weight_hh_l4':'rnns.4.rnn.weight_hh_l0',
+                'rnn.bias_ih_l4':'rnns.4.rnn.bias_ih_l0',
+                'rnn.bias_hh_l4':'rnns.4.rnn.bias_hh_l0'}
+        return layer_mapping
+
+    def remove_layers(self):
+        """
+        returns a list of the layers in the trained model to remove
+        the destination (dest) model has one less conv layer and
+        the first rnn layer is a different size so these layers are
+        removed
+        """
+    
+        remove_layers = [ 'fc.fc.weight','fc.fc.bias']
+        return remove_layers
 
 
 if __name__ == '__main__':

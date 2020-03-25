@@ -53,6 +53,7 @@ parser.add_argument('--model-path', default='models/deepspeech_final.pth',
 parser.add_argument('--continue-from', default='', help='Continue from checkpoint model')
 parser.add_argument('--finetune', dest='finetune', action='store_true',
                     help='Finetune the model from checkpoint "continue_from"')
+parser.add_argument('--pretrained-path', default='', help='Path to load trained model from. Alter the configuration of layer_mapping and remove_layers in model.py')
 parser.add_argument('--speed-volume-perturb', dest='speed_volume_perturb', action='store_true', help='Use random tempo and gain perturbations.')
 parser.add_argument('--spec-augment', dest='spec_augment', action='store_true', help='Use simple spectral augmentation on mel spectograms.')
 parser.add_argument('--noise-dir', default=None,
@@ -192,6 +193,8 @@ if __name__ == '__main__':
                            audio_conf=audio_conf,
                            bidirectional=args.bidirectional,
                            use_lookahead=args.use_lookahead)
+        if args.pretrained_path:
+            model.load_pretrained(args.pretrained_path)
 
     decoder = GreedyDecoder(labels)
     train_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest, labels=labels,
