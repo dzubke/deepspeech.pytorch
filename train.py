@@ -46,7 +46,7 @@ parser.add_argument('--visdom', dest='visdom', action='store_true', help='Turn o
 parser.add_argument('--tensorboard', dest='tensorboard', action='store_true', help='Turn on tensorboard graphing')
 parser.add_argument('--log-dir', default='visualize/deepspeech_final', help='Location of tensorboard log')
 parser.add_argument('--log-params', dest='log_params', action='store_true', help='Log parameter values and gradients')
-parser.add_argument('--id', default='Deepspeech training', help='Identifier for visdom/tensorboard run')
+parser.add_argument('--id', default='Deepspeech_training', help='Identifier for visdom/tensorboard run')
 parser.add_argument('--save-folder', default='models/', help='Location to save epoch models')
 parser.add_argument('--model-path', default='models/deepspeech_final.pth',
                     help='Location to save best validation model')
@@ -67,9 +67,7 @@ parser.add_argument('--no-shuffle', dest='no_shuffle', action='store_true',
 parser.add_argument('--no-sortaGrad', dest='no_sorta_grad', action='store_true',
                     help='Turn off ordering of dataset on sequence length for the first epoch.')
 parser.add_argument('--no-bidirectional', dest='bidirectional', action='store_false', default=True,
-                    help='Turn off bi-directional RNNs')
-parser.add_argument('--use-lookahead', dest='use_lookahead', action='store_true', default=False,
-                    help='Turns on lookahead convolution')
+                    help='Turn off bi-directional RNNs, introduces lookahead convolution')
 parser.add_argument('--dist-url', default='tcp://127.0.0.1:1550', type=str,
                     help='url used to set up distributed training')
 parser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
@@ -84,7 +82,8 @@ parser.add_argument('--opt-level', type=str)
 parser.add_argument('--keep-batchnorm-fp32', type=str, default=None)
 parser.add_argument('--loss-scale', default=1,
                     help='Loss scaling used by Apex. Default is 1 due to warp-ctc not supporting scaling of gradients')
-
+parser.add_argument('--use-log', default=False, action='store_true', help="logs command history.")
+parser.add_argument('--log-path', default='commmand_log', type=str, help="path to command log file.")
 torch.manual_seed(123456)
 torch.cuda.manual_seed_all(123456)
 
@@ -114,6 +113,21 @@ class AverageMeter(object):
 
 if __name__ == '__main__':
     args = parser.parse_args()
+    
+    use_log = args.use_log:
+    if use_log: 
+        # create logger
+        logger = logging.getLogger("train_log")
+        logger.setLevel(logging.DEBUG)
+        # create file handler which logs even debug messages
+        fh = logging.FileHandler(args.log_path+".log")
+        fh.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', "%Y-%m-%d %H:%M:%S")
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+    else:
+        logger = None
+
 
     # Set seeds for determinism
     torch.manual_seed(args.seed)
@@ -181,6 +195,7 @@ if __name__ == '__main__':
                           noise_levels=(args.noise_min, args.noise_max),
                           spec_augment = args.spec_augment,
                           speed_volume_perturb = args.speed_volume_perturb)
+        if use_log: logger.info(f"audio_conf: {audio_conf}")
 
 
         rnn_type = args.rnn_type.lower()
@@ -190,14 +205,15 @@ if __name__ == '__main__':
                            labels=labels,
                            rnn_type=supported_rnns[rnn_type],
                            audio_conf=audio_conf,
-                           bidirectional=args.bidirectional,
-                           use_lookahead=args.use_lookahead)
+                           bidirectional=args.bidirectional)
+        if use_log: logger.info(f"model: {model}")
 
     decoder = GreedyDecoder(labels)
     train_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest, labels=labels,
-                                       normalize=True, speed_volume_perturb=args.speed_volume_perturb, spec_augment=args.spec_augment)
+                                       normalize=True, speed_volume_perturb=args.speed_volume_perturb, spec_augment=args.spec_augment,
+                                       logger=logger)
     test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.val_manifest, labels=labels,
-                                      normalize=True, speed_volume_perturb=False, spec_augment=False)
+                                      normalize=True, speed_volume_perturb=False, spec_augment=False, logger=logger)
     if not args.distributed:
         train_sampler = BucketingSampler(train_dataset, batch_size=args.batch_size)
     else:
@@ -237,13 +253,11 @@ if __name__ == '__main__':
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
-    train_duration=0
 
     for epoch in range(start_epoch, args.epochs):
         model.train()
         end = time.time()
         start_epoch_time = time.time()
-        epoch_remaining = 0
         for i, (data) in enumerate(train_loader, start=start_iter):
             if i == len(train_sampler):
                 break
@@ -255,10 +269,13 @@ if __name__ == '__main__':
 
             out, output_sizes = model(inputs, input_sizes)
             out = out.transpose(0, 1)  # TxNxH
+            if use_log: logger.info(f"processed data")
+
 
             float_out = out.float()  # ensure float32 for loss
             loss = criterion(float_out, targets, output_sizes, target_sizes).to(device)
-            loss = loss / inputs.size(0)  # average the loss by minibatch
+            loss = loss / inputs.size(0)  # average the loss by minibatch'
+
 
             if args.distributed:
                 loss = loss.to(device)
@@ -266,16 +283,23 @@ if __name__ == '__main__':
             else:
                 loss_value = loss.item()
 
+            if use_log: logger.info(f"Loss value: {loss_valuue}")
+
             # Check to ensure valid loss was calculated
             valid_loss, error = check_loss(loss, loss_value)
             if valid_loss:
                 optimizer.zero_grad()
+                if use_log: logger.info(f"Opt zero_grad")
+
                 # compute gradient
 
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
                     scaled_loss.backward()
                 torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), args.max_norm)
+                if use_log: logger.info(f"grad clipped")
+
                 optimizer.step()
+                if use_log: logger.info(f"optimizer step")
             else:
                 print(error)
                 print('Skipping grad update')
@@ -287,15 +311,17 @@ if __name__ == '__main__':
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
-            train_duration += (batch_time.val + data_time.val)/3600
-            epoch_remaining = (len(train_sampler)-i-1) * (batch_time.avg + data_time.avg)/3600
+            duration += batch_time.val + data_time.val
+            remaining += (len(train_sampler)-i-1) * (batch_time.avg + data_time.avg)
+            if use_log: logger.info(f"Epoch | iteration: {epoch+1} | {i+1}")
+
             if not args.silent:
                 print('Epoch: [{0}][{1}/{2}]\t'
-                      'Time(hr) tot:{train_duration:.2f} | rem:{epoch_remaining:.2f}\t'
+                      'Time: [{duration:.2f} | {remaining:.2f}\t'
                       'Model {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
-                    (epoch + 1), (i + 1), len(train_sampler), train_duration=train_duration, epoch_remaining=epoch_remaining, batch_time=batch_time, data_time=data_time, loss=losses))
+                    (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time, data_time=data_time, loss=losses))
             if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0 and main_proc:
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth' % (save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
@@ -319,7 +345,8 @@ if __name__ == '__main__':
                                              model=model,
                                              decoder=decoder,
                                              target_decoder=decoder, 
-                                             verbose=False)
+                                             verbose=False,
+                                             logger=logger)
         loss_results[epoch] = avg_loss
         wer_results[epoch] = wer
         cer_results[epoch] = cer

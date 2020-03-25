@@ -74,7 +74,7 @@ class NoiseInjection(object):
         noise_start = np.random.rand() * (noise_len - data_len)
         noise_end = noise_start + data_len
         noise_dst = audio_with_sox(noise_path, self.sample_rate, noise_start, noise_end)
-        noise_dst = self.same_size(data, noise_dst)
+        noise_dst = self.same_size(data, noie_dst)
         assert len(data) == len(noise_dst), f"data length {len(data)} doesn't match noise len {len(noise_dst)}"
         noise_energy = np.sqrt(noise_dst.dot(noise_dst) / noise_dst.size)
         data_energy = np.sqrt(data.dot(data) / data.size)
@@ -155,7 +155,8 @@ class SpectrogramParser(AudioParser):
 
 
 class SpectrogramDataset(Dataset, SpectrogramParser):
-    def __init__(self, audio_conf, manifest_filepath, labels, normalize=False, speed_volume_perturb=False, spec_augment=False):
+    def __init__(self, audio_conf, manifest_filepath, labels, normalize=False, speed_volume_perturb=False, spec_augment=False,
+                logger=None):
         """
         Dataset that loads tensors via a csv containing file paths to audio files and transcripts separated by
         a comma. Each new line is a different sample. Example below:
@@ -176,6 +177,8 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         self.ids = ids
         self.size = len(ids)
         self.labels_map = dict([(labels[i], i) for i in range(len(labels))])
+        self.use_log = (logger is not None)
+        self.logger = logger
         super(SpectrogramDataset, self).__init__(audio_conf, normalize, speed_volume_perturb, spec_augment)
 
     def __getitem__(self, index):
