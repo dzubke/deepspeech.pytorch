@@ -20,12 +20,18 @@ parser.add_argument('--save-output', default=None, help="Saves output of model f
 parser = add_decoder_args(parser)
 
 
-def evaluate(test_loader, device, model, decoder, target_decoder, save_output=False, verbose=False, half=False):
+def evaluate(test_loader, device, model, decoder, target_decoder, save_output=False, verbose=False, 
+            half=False, logger=None):
+    use_log = (logger is not None)
     model.eval()
+    if use_log: logger.info(f"in evaluate")
+
     total_cer, total_wer, num_tokens, num_chars = 0, 0, 0, 0
     output_data = []
     for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
         inputs, targets, input_percentages, target_sizes = data
+        if use_log: logger.info(f"targets: {targets}")
+
         input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
         inputs = inputs.to(device)
         if half:
@@ -38,8 +44,10 @@ def evaluate(test_loader, device, model, decoder, target_decoder, save_output=Fa
             offset += size
 
         out, output_sizes = model(inputs, input_sizes)
-        print(f"test: out sizes: {[x.size() for x in out]}")
-        print(f"test: output_sizes: {output_sizes}")
+        if use_log: logger.info(f"predictions made")
+
+        #print(f"test: out sizes: {[x.size() for x in out]}")
+        #print(f"test: output_sizes: {output_sizes}"
         decoded_output, _ = decoder.decode(out, output_sizes)
         #print(f"test: decoded_output: {decoded_output}, size: {[len(out[0]) for out in decoded_output]}")
         target_strings = target_decoder.convert_to_strings(split_targets)
@@ -55,6 +63,10 @@ def evaluate(test_loader, device, model, decoder, target_decoder, save_output=Fa
             total_cer += cer_inst
             num_tokens += len(reference)
             num_chars += len("".join(reference))
+            if use_log: 
+                logger.info(f"Ref: {reference}")
+                logger.info(f"WER: {float(wer_inst) / len(reference)}")
+
             if verbose:
                 print("Ref:", reference)
                 print("Hyp:", transcript)
@@ -73,7 +85,6 @@ if __name__ == '__main__':
 
     if args.decoder == "beam":
         from decoder import BeamCTCDecoder
-        print(f"label size in beamdecoder:{len(model.labels)}")
         decoder = BeamCTCDecoder(model.labels, lm_path=args.lm_path, alpha=args.alpha, beta=args.beta,
                                  cutoff_top_n=args.cutoff_top_n, cutoff_prob=args.cutoff_prob,
                                  beam_width=args.beam_width, num_processes=args.lm_workers)
@@ -98,16 +109,5 @@ if __name__ == '__main__':
     print('Test Summary \t'
           'Average WER {wer:.3f}\t'
           'Average CER {cer:.3f}\t'.format(wer=wer, cer=cer))
-    out_shape_set = set()
-    size_shape_set = set()
-    string_shape_set = set()
-    for data in output_data:
-        out, output_sizes, target_strings = data
-        out_shape_set.add(out.shape)
-        size_shape_set.add(output_sizes.shape)
-        string_shape_set.add(len(target_strings))
-    print(f"""shapes in output_data: {out_shape_set}\n 
-            shapes in output_sizes: {size_shape_set}\n 
-            shapes in target_strings: {string_shape_set}\n""")
     if args.save_output is not None:
         np.save(args.save_output, output_data)
